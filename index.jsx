@@ -1,195 +1,123 @@
-import React, { useState } from "react";
-import { Typography, Grid, TextField, Button, Paper } from "@mui/material";
-import { Redirect, useHistory } from "react-router-dom";
+import React from "react";
+import PropTypes from "prop-types";
+import { AppBar, Toolbar, Typography, CircularProgress, Button } from "@mui/material";
+import { withRouter } from "react-router-dom";
 import axios from "axios";
 
-const LoginRegister = ({ onLoginUserChange }) => {
-  const [loginName, setLoginName] = useState('');
-  const [password, setPassword] = useState('');
-  const [newLoginName, setNewLoginName] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
-  const [occupation, setOccupation] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [newPassword2, setNewPassword2] = useState('');
-  const [loginMessage, setLoginMessage] = useState('');
-  const [registeredMessage, setRegisteredMessage] = useState('');
-  const [redirectToUser, setRedirectToUser] = useState(false);
-  const history = useHistory();
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await axios.post('/admin/login', { login_name: loginName, password });
-      onLoginUserChange({ ...response.data, loginName });
-      history.push('/');
-    } catch (err) {
-      setLoginMessage('Login failed: ' + err.response.data);
-    }
-  };
-
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    if (newPassword !== newPassword2) {
-      setRegisteredMessage("The two passwords do not match. Please try again.");
-      return;
-    }
-
-    const newUser = {
-      login_name: newLoginName,
-      password: newPassword,
-      first_name: firstName,
-      last_name: lastName,
-      description,
-      location,
-      occupation,
+class TopBar extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      currentContext: "User List",
+      isLoadingContext: false,
+      user: null,
     };
-
-    try {
-      const response = await axios.post("/user", newUser);
-      setRegisteredMessage(response.data.message);
-      if (response.data.success) {
-        setRedirectToUser(true);
-      }
-    } catch (error) {
-      setRegisteredMessage(error.response ? error.response.data.message : "An error occurred");
-    }
-  };
-
-  if (redirectToUser) {
-    return <Redirect to={`/users/${newLoginName || loginName}`} />;
   }
 
-  return (
-    <Grid container spacing={2}>
-      {/* Login Form */}
-      <Grid item xs={6} container direction="column" alignItems="center">
-        <Typography variant="h5">Log In</Typography>
-        <form onSubmit={handleLogin} style={{ width: "100%" }}>
-          <TextField
-            label="Login Name"
-            variant="outlined"
-            value={loginName}
-            onChange={(e) => setLoginName(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Password"
-            type="password"
-            variant="outlined"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <Button type="submit" variant="contained" color="primary" fullWidth>
-            Login
-          </Button>
-          {loginMessage && (
-            <Typography style={{ color: "red", marginTop: "10px" }}>
-              {loginMessage}
-            </Typography>
-          )}
-        </form>
-      </Grid>
+  componentDidMount() {
+    this.updateContextBasedOnPath(this.props.location.pathname);
+    this.checkUserLogin();
+  }
 
-      {/* Register Form */}
-      <Grid item xs={6} container direction="column" alignItems="center">
-        <Typography variant="h5">Create New Account</Typography>
-        <form onSubmit={handleRegisterSubmit} style={{ width: "100%" }}>
-          <TextField
-            label="New Login Name"
-            variant="outlined"
-            value={newLoginName}
-            onChange={(e) => setNewLoginName(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="First Name"
-            variant="outlined"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Last Name"
-            variant="outlined"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Description"
-            variant="outlined"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Location"
-            variant="outlined"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Occupation"
-            variant="outlined"
-            value={occupation}
-            onChange={(e) => setOccupation(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="New Password"
-            type="password"
-            variant="outlined"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Re-enter Password"
-            type="password"
-            variant="outlined"
-            value={newPassword2}
-            onChange={(e) => setNewPassword2(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <Button type="submit" variant="contained" color="primary" fullWidth>
-            Register Me
-          </Button>
-          {registeredMessage && (
-            <Typography
-              style={{
-                color: registeredMessage.includes("successfully") ? "green" : "red",
-                marginTop: "10px",
-              }}
-            >
-              {registeredMessage}
+  componentDidUpdate(prevProps) {
+    if (this.props.location.pathname !== prevProps.location.pathname) {
+      this.updateContextBasedOnPath(this.props.location.pathname);
+    }
+  }
+
+  async updateContextBasedOnPath(path) {
+    this.setState({ isLoadingContext: true });
+
+    try {
+      if (path.startsWith("/users/")) {
+        const userId = path.split("/")[2];
+        const response = await axios.get(`/user/${userId}`);
+        const user = response.data;
+        this.setState({
+          currentContext: `${user.first_name} ${user.last_name}`,
+          isLoadingContext: false,
+        });
+      } else if (path.startsWith("/photos/")) {
+        const userId = path.split("/")[2];
+        const response = await axios.get(`/user/${userId}`);
+        const user = response.data;
+        this.setState({
+          currentContext: `Photos of ${user.first_name} ${user.last_name}`,
+          isLoadingContext: false,
+        });
+      } else {
+        this.setState({ currentContext: "User List", isLoadingContext: false });
+      }
+    } catch (error) {
+      console.error("Error fetching context:", error);
+      this.setState({ currentContext: "Error loading context", isLoadingContext: false });
+    }
+  }
+
+  async checkUserLogin() {
+    try {
+      const response = await axios.get("/admin/status");
+      this.setState({ user: response.data });
+    } catch (error) {
+      this.setState({ user: null });
+    }
+  }
+
+  handleLogout = () => {
+    axios
+      .post("/admin/logout")
+      .then(() => {
+        this.setState({ user: null });
+        this.props.history.push("/login");
+      })
+      .catch((error) => {
+        console.error("Logout failed:", error);
+      });
+  };
+
+  render() {
+    const { currentContext, isLoadingContext, user } = this.state;
+
+    return (
+      <AppBar position="static">
+        <Toolbar>
+          {/* Left: App Title */}
+          <Typography variant="h6" style={{ flex: 1 }}>
+            Зурагаа хуваалцая
+          </Typography>
+
+          {/* Right: Current Context */}
+          {isLoadingContext ? (
+            <CircularProgress size={24} style={{ color: "white", marginRight: "20px" }} />
+          ) : (
+            <Typography variant="h6" style={{ marginRight: "20px" }}>
+              {currentContext}
             </Typography>
           )}
-        </form>
-      </Grid>
-    </Grid>
-  );
+
+          {/* Right: User Login/Logout */}
+          {user ? (
+            <>
+              <Typography variant="h6" style={{ marginRight: "20px" }}>
+                Hi {user.first_name}
+              </Typography>
+              <Button color="inherit" onClick={this.handleLogout}>
+                Logout
+              </Button>
+            </>
+          ) : (
+            <Button color="inherit" onClick={() => this.props.history.push("/login")}>
+              Login
+            </Button>
+          )}
+        </Toolbar>
+      </AppBar>
+    );
+  }
+}
+
+TopBar.propTypes = {
+  location: PropTypes.object.isRequired,
 };
 
-export default LoginRegister;
+export default withRouter(TopBar);
